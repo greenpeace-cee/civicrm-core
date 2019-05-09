@@ -632,7 +632,8 @@ function _civicrm_api3_activity_fill_activity_contact_names(&$activities, $param
 
   $activityContactTypes = [$sourceType];
 
-  if (!empty($returns['target_contact_name']) || !empty($returns['target_contact_id'])) {
+  // target_contact_id is handled further down
+  if (!empty($returns['target_contact_name'])) {
     $activityContactTypes[] = $targetType;
   }
   if (!empty($returns['assignee_contact_name']) || (!empty($returns['assignee_contact_id']))) {
@@ -646,6 +647,7 @@ function _civicrm_api3_activity_fill_activity_contact_names(&$activities, $param
       'contact_id.display_name',
       'contact_id',
     ],
+    'options' => ['limit' => 0],
     'check_permissions' => !empty($params['check_permissions']),
   ];
   if (count($activityContactTypes) < 3) {
@@ -662,6 +664,13 @@ function _civicrm_api3_activity_fill_activity_contact_names(&$activities, $param
     else {
       $activities[$activityContact['activity_id']]['source_contact_id'] = $contactID;
       $activities[$activityContact['activity_id']]['source_contact_name'] = isset($activityContact['contact_id.display_name']) ? $activityContact['contact_id.display_name'] : '';
+    }
+  }
+  // if we're being asked to return target_contact_id but NOT target_contact_name,
+  // bypass API and go through BAO for better performance
+  if (!empty($returns['target_contact_id']) && empty($returns['target_contact_name'])) {
+    foreach ($activities as $key => $activityArray) {
+      $activities[$key]['target_contact_id'] = CRM_Activity_BAO_ActivityTarget::retrieveTargetIdsByActivityId($activityArray['id']);
     }
   }
 }
