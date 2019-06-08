@@ -101,4 +101,53 @@ class CRM_Utils_Check_Component_Schema extends CRM_Utils_Check_Component {
     return $messages;
   }
 
+  /**
+   * Check whether any log tables use the ARCHIVE storage engine and offer conversion
+   *
+   * @return array
+   */
+  public function checkLogTableEngine() {
+    $messages = [];
+    $text = '<p>Some of your log tables use the MySQL ARCHIVE storage engine.
+                  The ARCHIVE engine has known durability and performance issues.
+                  Converting log tables to InnoDB will improve the reliability
+                  of log tables and speed up the contact change log report.</p>
+               <p><strong>Conversion may take several minutes to several hours for large sites.</strong>
+                  During this process, your site will be partially unavailable
+                  and should be put into maintenance mode. By default, and
+                  unlike the ARCHIVE engine, InnoDB does not use compression, so
+                  <strong>table size will increase</strong>.
+                  It is highly recommended to test the conversion on a separate
+                  system with a full copy of your database.</p>
+                  <p>Please refer to <a href="TODO" target="_blank">TODO</a> for more details.</p>';
+    $msg = new CRM_Utils_Check_Message(
+      __FUNCTION__,
+      ts($text),
+      ts('Convert log tables'),
+      \Psr\Log\LogLevel::WARNING,
+      'fa-server'
+    );
+    $msg->addAction(
+      ts('Convert log tables'),
+      ts('Convert log tables to InnoDB? This may take several minutes to several hours for large sites and will increase the disk usage of your MySQL server.'),
+      'api3',
+      ['System', 'updatelogtables', ['forceEngineMigration' => TRUE]]
+    );
+    if (Civi::settings()->get('logging')) {
+      $logging = new CRM_Logging_Schema();
+      foreach ($logging->getLogTableSpec() as $logTable => $spec) {
+        $currentEngine = strtoupper($logging->getEngineForLogTable('log_' . $logTable));
+        // only act if $spec['engine'] is not set, i.e. ARCHIVE was not
+        // explicitly requested by an extension via hook_civicrm_alterLogTables
+        if (empty($spec['engine']) && $currentEngine == 'ARCHIVE') {
+          $messages[] = $msg;
+          // stop once we encounter the first ARCHIVE table
+          break;
+        }
+      }
+
+    }
+    return $messages;
+  }
+
 }
