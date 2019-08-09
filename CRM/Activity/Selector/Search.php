@@ -179,7 +179,11 @@ class CRM_Activity_Selector_Search extends CRM_Core_Selector_Base implements CRM
       // required here rather than "access my cases and activities" to
       // prevent those with only the later permission from seeing a list
       // of all cases which might present a privacy issue.
-      if (!CRM_Core_Permission::access($componentName, TRUE, TRUE)) {
+      $hasPermission = CRM_Core_Permission::access($componentName, TRUE, TRUE);
+      if ($componentName == 'CiviCampaign') {
+        $hasPermission = CRM_Core_Permission::check("manage campaign") || CRM_Core_Permission::check("administer $componentName");
+      }
+      if (!$hasPermission) {
         $componentClause[] = " (activity_type.component_id IS NULL OR activity_type.component_id <> {$componentID}) ";
       }
     }
