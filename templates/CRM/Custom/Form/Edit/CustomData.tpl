@@ -5,7 +5,7 @@
     <span class="icon delete-icon"></span> {ts}Delete{/ts}
   </a>
 {/if}
-
+Hello
 {if $cd_edit.help_pre}
   <div class="messages help">{$cd_edit.help_pre}</div>
 {/if}

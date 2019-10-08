@@ -107,6 +107,71 @@ class CRM_Contact_Form_Edit_Email {
         );
       }
     }
+
+    self::addCustomDataToForm($form, 211, $blockId);
+  }
+
+  /**
+   * Add custom data to the form.
+   *
+   * @param CRM_Core_Form $form
+   * @param int $entityId
+   * @param int $blockId
+   *
+   * @throws \CRM_Core_Exception
+   * @throws \CiviCRM_API3_Exception
+   */
+  protected static function addCustomDataToForm(&$form, $entityId, $blockId) {
+    $groupTree = CRM_Core_BAO_CustomGroup::getTree('Email', NULL, $entityId);
+
+    if (isset($groupTree) && is_array($groupTree)) {
+      // use simplified formatted groupTree
+      $groupTree = CRM_Core_BAO_CustomGroup::formatGroupTree($groupTree, 1, $form);
+
+      // make sure custom fields are added /w element-name in the format - 'address[$blockId][custom-X]'
+      foreach ($groupTree as $id => $group) {
+        foreach ($group['fields'] as $fldId => $field) {
+          $groupTree[$id]['fields'][$fldId]['element_custom_name'] = $field['element_name'];
+          $groupTree[$id]['fields'][$fldId]['element_name'] = "address[$blockId][{$field['element_name']}]";
+        }
+      }
+
+      $defaults = [];
+      CRM_Core_BAO_CustomGroup::setDefaults($groupTree, $defaults);
+
+      // since we change element name for address custom data, we need to format the setdefault values
+      $emailDefaults = [];
+      foreach ($defaults as $key => $val) {
+        if (!isset($val)) {
+          continue;
+        }
+
+        // inorder to set correct defaults for checkbox custom data, we need to converted flat key to array
+        // this works for all types custom data
+        $keyValues = explode('[', str_replace(']', '', $key));
+        $emailDefaults[$keyValues[0]][$keyValues[1]][$keyValues[2]] = $val;
+      }
+
+      $form->setDefaults($emailDefaults);
+
+      // we setting the prefix to 'dnc_' below, so that we don't overwrite smarty's grouptree var.
+      // And we can't set it to 'address_' because we want to set it in a slightly different format.
+      CRM_Core_BAO_CustomGroup::buildQuickForm($form, $groupTree, FALSE, 'dnc_');
+
+      // during contact editing : if no address is filled
+      // required custom data must not produce 'required' form rule error
+      // more handling done in formRule func
+      CRM_Contact_Form_Edit_Address::storeRequiredCustomDataInfo($form, $groupTree);
+
+      $tplGroupTree = CRM_Core_Smarty::singleton()
+        ->get_template_vars('email_groupTree');
+      $tplGroupTree = empty($tplGroupTree) ? [] : $tplGroupTree;
+
+      $form->assign('email_groupTree', $tplGroupTree + [$blockId => $groupTree]);
+      // unset the temp smarty var that got created
+      $form->assign('dnc_groupTree', NULL);
+    }
+    // address custom data processing ends ..
   }
 
 }

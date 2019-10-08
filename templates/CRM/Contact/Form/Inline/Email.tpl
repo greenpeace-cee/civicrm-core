@@ -60,6 +60,13 @@
         {/if}
       </td>
     </tr>
+    <tr>
+      <td>
+        <div>
+          {include file="CRM/Custom/Form/Edit/CustomData.tpl" customDataEntity='email'}
+        </div>
+      </td>
+    </tr>
   {/section}
 </table>
 

@@ -61,29 +61,6 @@ class CRM_Upgrade_Incremental_php_FiveTwenty extends CRM_Upgrade_Incremental_Bas
     // }
   }
 
-  /*
-   * Important! All upgrade functions MUST add a 'runSql' task.
-   * Uncomment and use the following template for a new upgrade version
-   * (change the x in the function name):
-   */
-
-  //  /**
-  //   * Upgrade function.
-  //   *
-  //   * @param string $rev
-  //   */
-  //  public function upgrade_5_0_x($rev) {
-  //    $this->addTask(ts('Upgrade DB to %1: SQL', [1 => $rev]), 'runSql', $rev);
-  //    $this->addTask('Do the foo change', 'taskFoo', ...);
-  //    // Additional tasks here...
-  //    // Note: do not use ts() in the addTask description because it adds unnecessary strings to transifex.
-  //    // The above is an exception because 'Upgrade DB to %1: SQL' is generic & reusable.
-  //  }
-
-  // public static function taskFoo(CRM_Queue_TaskContext $ctx, ...) {
-  //   return TRUE;
-  // }
-
   /**
    * Upgrade function.
    *
@@ -93,6 +70,30 @@ class CRM_Upgrade_Incremental_php_FiveTwenty extends CRM_Upgrade_Incremental_Bas
     $this->addTask('Add frontend title column to contribution page table', 'addColumn', 'civicrm_contribution_page',
       'frontend_title', "varchar(255) DEFAULT NULL COMMENT 'Contribution Page Public title'", TRUE, '5.20.alpha1');
     $this->addTask(ts('Upgrade DB to %1: SQL', [1 => $rev]), 'runSql', $rev);
+    $this->addTask('Add additional custom field entities', 'addAdditionalCustomFieldEntities');
+  }
+
+  /**
+   * Add custom field support to some entities via cg_extend_objects
+   *
+   * @return bool
+   */
+  public static function addAdditionalCustomFieldEntities() {
+    CRM_Core_BAO_OptionValue::ensureOptionValueExists([
+      'option_group_id' => 'cg_extend_objects',
+      'name'            => 'civicrm_email',
+      'label'           => ts('Email'),
+      'is_active'       => TRUE,
+    ]);
+
+    CRM_Core_BAO_OptionValue::ensureOptionValueExists([
+      'option_group_id' => 'cg_extend_objects',
+      'name'            => 'civicrm_phone',
+      'label'           => ts('Phone'),
+      'is_active'       => TRUE,
+    ]);
+
+    return TRUE;
   }
 
 }
