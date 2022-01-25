@@ -1274,4 +1274,88 @@ class CRM_Case_BAO_CaseTest extends CiviUnitTestCase {
     );
   }
 
+  /**
+   * Test that when an activity gets filed on a case the
+   * 'civicaseActivityRevisions' setting is respected
+   */
+  public function testFileOnCaseActivityRevision() {
+    $loggedInUserId = $this->createLoggedInUser();
+    $clientId = $this->individualCreate();
+    $caseObj = $this->createCase($clientId, $loggedInUserId);
+
+    $activityId_1 = $this->callAPISuccess('Activity', 'create', [
+      'activity_date_time' => date('Y-m-d H:i:s'),
+      'activity_type_id'   => 1,
+      'source_contact_id'  => $loggedInUserId,
+      'subject'            => 'Meeting #1',
+      'target_contact_id'  => $clientId,
+    ])['id'];
+
+    $activityId_2 = $this->callAPISuccess('Activity', 'create', [
+      'activity_date_time' => date('Y-m-d H:i:s'),
+      'activity_type_id'   => 1,
+      'source_contact_id'  => $loggedInUserId,
+      'subject'            => 'Meeting #2',
+      'target_contact_id'  => $clientId,
+    ])['id'];
+
+    // 1. If embedded activity revisions are disabled the original activity
+    //    should remain the current revision and no new activity should be
+    //    created
+
+    Civi::settings()->set('civicaseActivityRevisions', FALSE);
+
+    CRM_Activity_Page_AJAX::_convertToCaseActivity([
+      'activityID' => $activityId_1,
+      'caseID'     => $caseObj->id,
+      'mode'       => 'file',
+    ]);
+
+    $caseActivityCount_1 = $this->callAPISuccess('Activity', 'getcount', [
+      'id'      => $activityId_1,
+      'case_id' => $caseObj->id,
+    ]);
+
+    $this->assertEquals(1, $caseActivityCount_1, 'The original activity should still be linked to the case');
+
+    $isCurrentRev_1 = $this->callAPISuccess('Activity', 'getvalue', [
+      'id'     => $activityId_1,
+      'return' => 'is_current_revision',
+    ]);
+
+    $this->assertEquals('1', $isCurrentRev_1, 'The original activity should still be the current revision');
+
+    // 2. If embedded activity revisions are enabled the a new activity should
+    //    be created as the current revision
+
+    Civi::settings()->set('civicaseActivityRevisions', TRUE);
+
+    CRM_Activity_Page_AJAX::_convertToCaseActivity([
+      'activityID' => $activityId_2,
+      'caseID'     => $caseObj->id,
+      'mode'       => 'file',
+    ]);
+
+    $caseActivityCount_2 = $this->callAPISuccess('Activity', 'getcount', [
+      'id'      => $activityId_2,
+      'case_id' => $caseObj->id,
+    ]);
+
+    $this->assertEquals(0, $caseActivityCount_2, 'The original activity should no longer be linked to the case');
+
+    $newActivityCount = $this->callAPISuccess('Activity', 'getcount', [
+      'case_id'     => $caseObj->id,
+      'original_id' => $activityId_2,
+    ]);
+
+    $this->assertEquals(1, $newActivityCount, 'A new activity should be linked to the case');
+
+    $isCurrentRev_2 = $this->callAPISuccess('Activity', 'getvalue', [
+      'id'     => $activityId_2,
+      'return' => 'is_current_revision',
+    ]);
+
+    $this->assertEquals('0', $isCurrentRev_2, 'The original activity should not be the current revision');
+  }
+
 }

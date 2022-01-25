@@ -294,109 +294,121 @@ class CRM_Activity_Page_AJAX {
       return (['error_msg' => 'required params missing.']);
     }
 
-    $otherActivity = new CRM_Activity_DAO_Activity();
-    $otherActivity->id = $params['activityID'];
-    if (!$otherActivity->find(TRUE)) {
+    $originalActivity = new CRM_Activity_DAO_Activity();
+    $originalActivity->id = $params['activityID'];
+
+    if (!$originalActivity->find(TRUE)) {
       return (['error_msg' => 'activity record is missing.']);
     }
-    $actDateTime = $otherActivity->activity_date_time;
 
-    // Create new activity record.
-    $mainActivity = new CRM_Activity_DAO_Activity();
-    $mainActVals = [];
-    CRM_Core_DAO::storeValues($otherActivity, $mainActVals);
+    if ($params['mode'] == 'move' || Civi::settings()->get('civicaseActivityRevisions')) {
+      // Create new activity record
+      $activity = new CRM_Activity_DAO_Activity();
+      $activityValues = [];
+      CRM_Core_DAO::storeValues($originalActivity, $activityValues);
+      $activity->copyValues($activityValues);
+      $activity->id = NULL;
 
-    // Get new activity subject.
-    if (!empty($params['newSubject'])) {
-      $mainActVals['subject'] = $params['newSubject'];
-    }
+      // Make sure this is current revision
+      $activity->is_current_revision = TRUE;
+      $activity->original_id = $originalActivity->id;
+      $originalActivity->is_current_revision = FALSE;
 
-    $mainActivity->copyValues($mainActVals);
-    $mainActivity->id = NULL;
-    $mainActivity->activity_date_time = $actDateTime;
-    // Make sure this is current revision.
-    $mainActivity->is_current_revision = TRUE;
-    $mainActivity->original_id = $otherActivity->id;
-    $otherActivity->is_current_revision = FALSE;
-
-    $mainActivity->save();
-    $mainActivityId = $mainActivity->id;
-    CRM_Activity_BAO_Activity::logActivityAction($mainActivity);
-
-    // Mark previous activity as deleted. If it was a non-case activity
-    // then just change the subject.
-    if (in_array($params['mode'], [
-      'move',
-      'file',
-    ])) {
+      // If activity is moved to another case mark previous activity as deleted
+      // If it is a non-case activity then just change the subject
       $caseActivity = new CRM_Case_DAO_CaseActivity();
       $caseActivity->case_id = $params['caseID'];
-      $caseActivity->activity_id = $otherActivity->id;
-      if ($params['mode'] == 'move' || $caseActivity->find(TRUE)) {
-        $otherActivity->is_deleted = 1;
-      }
-      else {
-        $otherActivity->subject = ts('(Filed on case %1)', [
-          1 => $params['caseID'],
-        ]) . ' ' . $otherActivity->subject;
-      }
-      $otherActivity->save();
+      $caseActivity->activity_id = $originalActivity->id;
 
+      if ($params['mode'] == 'move' || $caseActivity->find(TRUE)) {
+        $originalActivity->is_deleted = 1;
+      } else {
+        $subPrefix = ts('(Filed on case %1)', [ 1 => $params['caseID'] ]);
+        $originalActivity->subject = "$subPrefix $originalActivity->subject";
+      }
+
+      $originalActivity->save();
+    } else {
+      $activity = $originalActivity;
     }
 
+    // Get new activity subject
+    if (!empty($params['newSubject'])) {
+      $activity->subject = $params['newSubject'];
+    }
+
+    // Save activity changes
+    $activity->save();
+    CRM_Activity_BAO_Activity::logActivityAction($activity);
+
+    // Get activity contact type IDs
+    $activityContactTypes = CRM_Activity_BAO_ActivityContact::buildOptions('record_type_id', 'validate');
+    $sourceTypeID = CRM_Utils_Array::key('Activity Source', $activityContactTypes);
+    $targetTypeID = CRM_Utils_Array::key('Activity Targets', $activityContactTypes);
+    $assigneeTypeID = CRM_Utils_Array::key('Activity Assignees', $activityContactTypes);
+
+    // Set source contact for activity
+    $sourceContactID = CRM_Activity_BAO_Activity::getSourceContactID($params['activityID']);
+
+    $sourceParams = [
+      'activity_id'    => $activity->id,
+      'contact_id'     => $sourceContactID,
+      'record_type_id' => $sourceTypeID,
+    ];
+
+    CRM_Activity_BAO_ActivityContact::create($sourceParams);
+
+    // Set target contacts for activity
     $targetContacts = [];
+
     if (!empty($params['targetContactIds'])) {
       $targetContacts = array_unique(explode(',', $params['targetContactIds']));
     }
 
-    $activityContacts = CRM_Activity_BAO_ActivityContact::buildOptions('record_type_id', 'validate');
-    $sourceID = CRM_Utils_Array::key('Activity Source', $activityContacts);
-    $assigneeID = CRM_Utils_Array::key('Activity Assignees', $activityContacts);
-    $targetID = CRM_Utils_Array::key('Activity Targets', $activityContacts);
-
-    $sourceContactID = CRM_Activity_BAO_Activity::getSourceContactID($params['activityID']);
-    $src_params = [
-      'activity_id' => $mainActivityId,
-      'contact_id' => $sourceContactID,
-      'record_type_id' => $sourceID,
-    ];
-    CRM_Activity_BAO_ActivityContact::create($src_params);
-
     foreach ($targetContacts as $key => $value) {
-      $targ_params = [
-        'activity_id' => $mainActivityId,
-        'contact_id' => $value,
-        'record_type_id' => $targetID,
+      $targetParams = [
+        'activity_id'    => $activity->id,
+        'contact_id'     => $value,
+        'record_type_id' => $targetTypeID,
       ];
-      CRM_Activity_BAO_ActivityContact::create($targ_params);
+
+      CRM_Activity_BAO_ActivityContact::create($targetParams);
     }
 
-    //CRM-21114 retrieve assignee contacts from original case; allow overriding from params
-    $assigneeContacts = CRM_Activity_BAO_ActivityContact::retrieveContactIdsByActivityId($params['activityID'], $assigneeID);
+    // Set assignee contacts for activity
+    // CRM-21114 retrieve assignee contacts from original case; allow overriding from params
+    $assigneeContacts = CRM_Activity_BAO_ActivityContact::retrieveContactIdsByActivityId($params['activityID'], $assigneeTypeID);
+
     if (!empty($params['assigneeContactIds'])) {
       $assigneeContacts = array_unique(explode(',', $params['assigneeContactIds']));
     }
+
     foreach ($assigneeContacts as $value) {
       $assigneeParams = [
-        'activity_id' => $mainActivityId,
-        'contact_id' => $value,
-        'record_type_id' => $assigneeID,
+        'activity_id'    => $mainActivityId,
+        'contact_id'     => $value,
+        'record_type_id' => $assigneeTypeID,
       ];
+
       CRM_Activity_BAO_ActivityContact::create($assigneeParams);
     }
 
-    // Attach newly created activity to case.
+    // Attach activity to case
     $caseActivity = new CRM_Case_DAO_CaseActivity();
     $caseActivity->case_id = $params['caseID'];
-    $caseActivity->activity_id = $mainActivityId;
+    $caseActivity->activity_id = $activity->id;
     $caseActivity->save();
-    $error_msg = $caseActivity->_lastError;
 
-    $params['mainActivityId'] = $mainActivityId;
-    CRM_Activity_BAO_Activity::copyExtendedActivityData($params);
     CRM_Utils_Hook::post('create', 'CaseActivity', $caseActivity->id, $caseActivity);
 
-    return (['error_msg' => $error_msg, 'newId' => $mainActivity->id]);
+    // Copy custom fields and attachments to activity
+    $params['mainActivityId'] = $activity->id;
+    CRM_Activity_BAO_Activity::copyExtendedActivityData($params);
+
+    return [
+      'error_msg' => $caseActivity->_lastError,
+      'newId'     => $activity->id,
+    ];
   }
 
   /**
