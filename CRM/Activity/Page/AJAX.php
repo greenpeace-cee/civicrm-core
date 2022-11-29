@@ -37,7 +37,7 @@ class CRM_Activity_Page_AJAX {
       'activity_date_high' => 'Alphanumeric',
     ];
 
-    $params = CRM_Core_Page_AJAX::defaultSortAndPagerParams();
+    $params = CRM_Core_Page_AJAX::defaultSortAndPagerParams(0, 25, 'activity_date_time', 'desc');
     $params += CRM_Core_Page_AJAX::validateParams([], $optionalParameters);
 
     // get the activities related to given case
