@@ -515,6 +515,7 @@ class CRM_Contribute_BAO_Contribution extends CRM_Contribute_DAO_Contribution im
       $existingActivity = Activity::get(FALSE)->setWhere([
         ['source_record_id', '=', $contribution->id],
         ['activity_type_id:name', '=', 'Contribution'],
+        ['is_test', 'IN', [TRUE, FALSE]]
       ])->execute()->first();
 
       $activityParams = [

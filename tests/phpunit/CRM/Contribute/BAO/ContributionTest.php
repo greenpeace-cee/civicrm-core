@@ -1708,4 +1708,59 @@ WHERE eft.entity_id = %1 AND ft.to_financial_account_id <> %2";
     $this->assertNull($activity['campaign_id'], 'Should have removed campaign from contribution activity');
   }
 
+  /**
+   * Test contribution activity creation in various is_test scenarios
+   *
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\API\Exception\UnauthorizedException
+   */
+  public function testContributionIsTestActivity() {
+    $contactId = $this->individualCreate();
+    $contribution = Contribution::create(FALSE)
+      ->addValue('contact_id', $contactId)
+      ->addValue('financial_type_id:name', 'Donation')
+      ->addValue('total_amount', 50)
+      ->addValue('contribution_status_id:name', 'Completed')
+      ->addValue('is_test', TRUE)
+      ->execute()
+      ->first();
+    $activityWhere = [
+      ['source_record_id', '=', $contribution['id']],
+      ['activity_type_id:name', '=', 'Contribution'],
+    ];
+    $activity = Activity::get(FALSE)->setWhere($activityWhere)
+      ->addWhere('is_test', '=', TRUE)
+      ->execute()
+      ->first();
+    $this->assertEquals(
+      $activity['source_record_id'],
+      $contribution['id'],
+      'Should create contribution activity with is_test=1'
+    );
+
+    Contribution::update(FALSE)
+      ->addWhere('id', '=', $contribution['id'])
+      ->addValue('is_test', FALSE)
+      ->execute();
+    $activity = Activity::get()->setWhere($activityWhere)
+      ->addWhere('is_test', '=', FALSE)
+      ->execute()
+      ->first();
+    $this->assertEquals(
+      $activity['source_record_id'],
+      $contribution['id'],
+      'Should update activity to is_test=0'
+    );
+
+    $activity = Activity::get(FALSE)->setWhere($activityWhere)
+      ->addWhere('is_test', '=', TRUE)
+      ->execute()
+      ->first();
+    $this->assertEmpty(
+      $activity,
+      'Should no longer have contribution activity with is_test=1'
+    );
+
+  }
+
 }
