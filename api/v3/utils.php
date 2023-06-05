@@ -2100,10 +2100,9 @@ function _civicrm_api3_validate_integer(&$params, $fieldName, &$fieldInfo, $enti
       }
     }
     if (
-      !empty($fieldInfo['pseudoconstant']) ||
-      !empty($fieldInfo['options']) ||
+      (!empty($fieldInfo['pseudoconstant']) || !empty($fieldInfo['options'])) &&
       // Special case for campaign_id which is no longer a pseudoconstant
-      ($fieldName === 'campaign_id' && !CRM_Utils_Rule::positiveInteger($fieldValue))
+      !($fieldName === 'campaign_id' && CRM_Utils_Rule::positiveInteger($fieldValue))
     ) {
       $additional_lookup_params = [];
       if (strtolower($entity) === 'address' && $fieldName == 'state_province_id') {
