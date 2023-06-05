@@ -89,12 +89,11 @@ class CRM_Event_Import_Form_MapField extends CRM_Import_Form_MapField {
       );
 
       $contactFieldsBelowWeightMessage = self::validateRequiredContactMatchFields($self->getContactType(), $importKeys);
-
       foreach ($requiredFields as $field => $title) {
         if (!in_array($field, $importKeys)) {
           if ($field === 'contact_id') {
             if (!$contactFieldsBelowWeightMessage || in_array('external_identifier', $importKeys) ||
-              in_array('participant_id', $importKeys)
+              in_array('id', $importKeys)
             ) {
               continue;
             }

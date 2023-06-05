@@ -137,6 +137,7 @@ class CRM_Event_Import_Parser_Participant extends CRM_Import_Parser {
 
       $formatError = $this->formatValues($formatted, $formatValues);
 
+
       if ($formatError) {
         throw new CRM_Core_Exception($formatError['error_message']);
       }
@@ -148,17 +149,17 @@ class CRM_Event_Import_Parser_Participant extends CRM_Import_Parser {
         );
       }
       else {
-        if (!empty($formatValues['participant_id'])) {
+        if (!empty($formatValues['id'])) {
           $dao = new CRM_Event_BAO_Participant();
-          $dao->id = $formatValues['participant_id'];
+          $dao->id = $formatValues['id'];
 
           $formatted['custom'] = CRM_Core_BAO_CustomField::postProcess($formatted,
-            $formatValues['participant_id'],
+            $formatValues['id'],
             'Participant'
           );
           if ($dao->find(TRUE)) {
             $ids = [
-              'participant' => $formatValues['participant_id'],
+              'participant' => $formatValues['id'],
               'userId' => $session->get('userID'),
             ];
             $participantValues = [];
@@ -180,7 +181,7 @@ class CRM_Event_Import_Parser_Participant extends CRM_Import_Parser {
             $this->setImportStatus($rowNumber, 'IMPORTED', '', $newParticipant->id);
             return;
           }
-          throw new CRM_Core_Exception('Matching Participant record not found for Participant ID ' . $formatValues['participant_id'] . '. Row was skipped.');
+          throw new CRM_Core_Exception('Matching Participant record not found for Participant ID ' . $formatValues['id'] . '. Row was skipped.');
         }
       }
 
