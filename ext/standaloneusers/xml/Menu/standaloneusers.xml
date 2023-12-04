@@ -23,4 +23,10 @@
     <title>Reset Password</title>
     <access_arguments>access password resets</access_arguments>
   </item>
+  <item>
+    <path>civicrm/admin/setting/standaloneusers</path>
+    <page_callback>CRM_Admin_Form_Generic</page_callback>
+    <title>Set Session Lifetime</title>
+    <access_arguments>administer CiviCRM</access_arguments>
+  </item>
 </menu>
