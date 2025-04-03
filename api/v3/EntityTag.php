@@ -138,10 +138,6 @@ function _civicrm_api3_entity_tag_common($params, $op = 'add') {
       $values['not_removed'] += $nr;
     }
   }
-  if (empty($values['added']) && empty($values['removed'])) {
-    $values['is_error'] = 1;
-    $values['error_message'] = "Unable to $op tags";
-  }
   return $values;
 }
 
