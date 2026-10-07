@@ -15,10 +15,14 @@
  * @copyright CiviCRM LLC https://civicrm.org/licensing
  */
 
+use Civi\Api4\Event\AuthorizeRecordEvent;
+use Civi\Api4\Utils\CoreUtil;
+use Civi\Core\HookInterface;
+
 /**
  * This class is for activity assignment functions.
  */
-class CRM_Activity_BAO_ActivityContact extends CRM_Activity_DAO_ActivityContact {
+class CRM_Activity_BAO_ActivityContact extends CRM_Activity_DAO_ActivityContact implements HookInterface {
 
   /**
    * Function to add activity contact.
@@ -142,6 +146,23 @@ AND        civicrm_contact.is_deleted = 0
   public function links() {
     $link = ['activity_id' => 'civicrm_activity:id'];
     return $link;
+  }
+
+  /**
+   * @see \Civi\Api4\Utils\CoreUtil::checkAccessRecord
+   */
+  public static function self_civi_api4_authorizeRecord(AuthorizeRecordEvent $e): void {
+    $record = $e->getRecord();
+    $activityId = $record['activity_id'] ?? NULL;
+    if (!$activityId && !empty($record['id'])) {
+      $activityId = CRM_Core_DAO::singleValueQuery('SELECT activity_id FROM civicrm_activity_contact WHERE id = %1', [
+        1 => [$record['id'], 'Positive'],
+      ]);
+    }
+    if ($activityId) {
+      $action = $e->getActionName() === 'get' ? 'get' : 'update';
+      $e->setAuthorized(CoreUtil::checkAccessDelegated('Activity', $action, ['id' => $activityId], $e->getUserID()));
+    }
   }
 
 }

@@ -2598,4 +2598,39 @@ $textValue
     return $this->ids['Campaign'][0];
   }
 
+  /**
+   * Removing an assignee is an edit of the activity, so it should not require 'delete activities'.
+   *
+   * @throws \CRM_Core_Exception
+   */
+  public function testRemoveAssigneeWithoutDeleteActivitiesPermission(): void {
+    $sourceContactId = $this->createTestEntity('Contact', ['contact_type' => 'Individual', 'first_name' => 'Source'], 'source')['id'];
+    $assigneeContactId = $this->createTestEntity('Contact', ['contact_type' => 'Individual', 'first_name' => 'Assignee'], 'assignee')['id'];
+    $activityId = $this->createTestEntity('Activity', [
+      'source_contact_id' => $sourceContactId,
+      'assignee_contact_id' => [$assigneeContactId],
+      'activity_type_id:name' => 'Meeting',
+      'subject' => 'Remove my assignee',
+    ])['id'];
+    $assigneeRecordTypeId = CRM_Core_PseudoConstant::getKey('CRM_Activity_BAO_ActivityContact', 'record_type_id', 'Activity Assignees');
+    $this->assertEquals([$assigneeContactId], CRM_Activity_BAO_ActivityContact::retrieveContactIdsByActivityId($activityId, $assigneeRecordTypeId));
+
+    $this->createLoggedInUser();
+    CRM_Core_Config::singleton()->userPermissionClass->permissions = [
+      'access CiviCRM',
+      'view all contacts',
+      'edit all contacts',
+      'view all activities',
+    ];
+
+    $params = [
+      'id' => $activityId,
+      'assignee_contact_id' => [],
+      'check_permissions' => TRUE,
+    ];
+    CRM_Activity_BAO_Activity::create($params);
+
+    $this->assertEquals([], CRM_Activity_BAO_ActivityContact::retrieveContactIdsByActivityId($activityId, $assigneeRecordTypeId));
+  }
+
 }

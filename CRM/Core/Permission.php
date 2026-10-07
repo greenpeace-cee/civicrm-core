@@ -1200,6 +1200,8 @@ class CRM_Core_Permission {
       ],
     ];
     $permissions['activity_contact'] = $permissions['activity'];
+    // this implies $permissions['activity']['default'] for deletes:
+    unset($permissions['activity_contact']['delete']);
 
     // Case permissions
     $permissions['case'] = [
